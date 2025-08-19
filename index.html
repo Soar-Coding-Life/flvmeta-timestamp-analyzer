@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLV时间戳分析器</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.0/dist/echarts.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 100%;
+            width: 100%;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.2);
+        }
+        @media (min-width: 768px) {
+            .container {
+                width: 95%;
+                margin: 20px auto;
+                border-radius: 10px;
+            }
+        }
+        @media (min-width: 1200px) {
+            .container {
+                width: 90%;
+                max-width: 1600px;
+            }
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 40px;
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            background-color: #f8f9ff;
+            transition: all 0.3s ease;
+        }
+        .upload-section:hover {
+            border-color: #764ba2;
+            background-color: #eef0ff;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .upload-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        .instructions {
+            text-align: left;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #eef0ff;
+            border-radius: 8px;
+        }
+        .instructions ol {
+            text-align: left;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin-bottom: 15px;
+        }
+        .instructions pre {
+            background-color: #d6daff;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 10px 0;
+            font-size: 0.9rem;
+        }
+        #fileInput {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background-color: #fff;
+            font-size: 1rem;
+            width: 80%;
+            max-width: 400px;
+        }
+        #fileInput:hover {
+            background-color: #f0f4ff;
+            cursor: pointer;
+        }
+        #fileName {
+            margin: 15px 0;
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+        .chart-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .chart-container {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+        #audioChart, #videoChart {
+            width: 100%;
+            min-height: 600px;
+        }
+        @media (max-width: 768px) {
+            .chart-row {
+                flex-direction: column;
+            }
+            #audioChart, #videoChart {
+                min-height: 450px;
+            }
+        }
+        .hidden {
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+        .loading::after {
+            content: ".";
+            animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { content: "."; }
+            33% { content: ".."; }
+            66% { content: "..."; }
+        }
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            padding: 20px;
+            background-color: #fdf2f2;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .info-panel {
+            background: linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%);
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .info-panel h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        .info-panel pre {
+            background-color: #f1f3f9;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+        .info-panel p {
+            margin: 8px 0;
+        }
+        .info-panel h4 {
+            color: #764ba2;
+            margin: 15px 0 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <div class="upload-section">
+            <h2>FLV时间戳分析工具</h2>
+            <p>请选择通过flvmeta生成的JSON文件</p>
+            <div class="instructions">
+                <p><strong>使用方法：</strong></p>
+                <ol>
+                    <li>安装flvmeta工具:
+                        <pre>brew install flvmeta  # macOS
+# 或
+sudo apt-get install flvmeta  # Ubuntu/Debian
+# 或从 https://github.com/noirotm/flvmeta 下载</pre>
+                    </li>
+                    <li>生成JSON文件:
+                        <pre>flvmeta -F -j your_video.flv > output.json</pre>
+                    </li>
+                    <li>选择生成的JSON文件进行分析</li>
+                </ol>
+            </div>
+            <input type="file" id="fileInput" accept=".json">
+            <div id="fileName"></div>
+        </div>
+        
+        <div id="infoPanel" class="info-panel hidden">
+            <h3>文件信息</h3>
+            <div id="fileInfo"></div>
+        </div>
+        
+        <div id="loading" class="loading hidden">
+            <p>正在分析数据...</p>
+        </div>
+        
+        <div id="error" class="error hidden">
+            <p id="errorMessage"></p>
+        </div>
+        
+        <div id="charts" class="hidden">
+            <div class="chart-row">
+                <div class="chart-container">
+                    <div id="audioChart"></div>
+                </div>
+                <div class="chart-container">
+                    <div id="videoChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面元素
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const infoPanel = document.getElementById('infoPanel');
+        const fileInfo = document.getElementById('fileInfo');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const errorMessage = document.getElementById('errorMessage');
+        const charts = document.getElementById('charts');
+        
+        // 事件监听器
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // 显示文件名
+            fileName.textContent = `已选择: ${file.name}`;
+            
+            // 显示加载状态
+            showError('');
+            showLoading(true);
+            showCharts(false);
+            showInfoPanel(false);
+            
+            // 读取文件
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    processJsonData(jsonData);
+                } catch (err) {
+                    showError('JSON解析失败: ' + err.message);
+                    showLoading(false);
+                }
+            };
+            reader.onerror = function() {
+                showError('文件读取失败');
+                showLoading(false);
+            };
+            reader.readAsText(file);
+        }
+        
+        // 处理JSON数据
+        function processJsonData(jsonData) {
+            try {
+                console.log('Processing JSON data:', jsonData);
+                // 分析时间戳
+                const analysisData = analyzeTimestamps(jsonData);
+                console.log('Analysis data:', analysisData);
+                
+                // 显示文件信息
+                showFileInfo(analysisData);
+                
+                // 显示图表容器
+                showCharts(true);
+                showInfoPanel(true);
+                
+                // 创建图表
+                setTimeout(() => {
+                    createCharts(analysisData);
+                    showLoading(false);
+                }, 100);
+            } catch (err) {
+                console.error('Data processing error:', err);
+                showError('数据处理失败: ' + err.message);
+                showLoading(false);
+            }
+        }
+        
+        // 分析时间戳
+        function analyzeTimestamps(jsonData) {
+            // 分离音频和视频标签
+            const audioTimestamps = [];
+            const videoTimestamps = [];
+            
+            // 确保tags字段存在
+            if (!jsonData.tags) {
+                throw new Error("JSON数据中缺少'tags'字段");
+            }
+            
+            for (let i = 0; i < jsonData.tags.length; i++) {
+                const tag = jsonData.tags[i];
+                if (!tag.type) continue;
+                
+                if (tag.type === 'audio') {
+                    audioTimestamps.push({
+                        index: i,
+                        timestamp: tag.timestamp || 0,
+                        dataSize: tag.dataSize || 0
+                    });
+                } else if (tag.type === 'video') {
+                    videoTimestamps.push({
+                        index: i,
+                        timestamp: tag.timestamp || 0,
+                        dataSize: tag.dataSize || 0
+                    });
+                }
+            }
+            
+            // 计算差值函数
+            function calculateDiffs(timestamps) {
+                if (timestamps.length < 2) {
+                    return { sorted: [], positions: [], diffs: [] };
+                }
+                
+                // 按时间戳排序
+                const timestampsSorted = timestamps.slice().sort((a, b) => a.timestamp - b.timestamp);
+                const timestampsValues = timestampsSorted.map(t => t.timestamp);
+                const diffs = [];
+                const positions = [];
+                
+                for (let i = 1; i < timestampsValues.length; i++) {
+                    diffs.push(timestampsValues[i] - timestampsValues[i-1]);
+                    positions.push(timestampsValues[i]);
+                }
+                
+                return {
+                    sorted: timestampsSorted,
+                    positions: positions,
+                    diffs: diffs
+                };
+            }
+            
+            // 处理音频时间戳
+            const audioData = calculateDiffs(audioTimestamps);
+            // 处理视频时间戳
+            const videoData = calculateDiffs(videoTimestamps);
+            
+            // 计算统计信息
+            function calculateStats(diffs) {
+                if (diffs.length === 0) {
+                    return {};
+                }
+                
+                const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+                const maxVal = Math.max(...diffs);
+                const minVal = Math.min(...diffs);
+                
+                return {
+                    avg: avg,
+                    max: maxVal,
+                    min: minVal
+                };
+            }
+            
+            const audioStats = calculateStats(audioData.diffs);
+            const videoStats = calculateStats(videoData.diffs);
+            
+            // 文件基本信息
+            let filename = '未知文件';
+            if (jsonData.metadata && jsonData.metadata.filename) {
+                filename = jsonData.metadata.filename;
+            }
+            
+            return {
+                filename: filename,
+                metadata: jsonData.metadata || {},
+                audio: {
+                    timestamps: audioTimestamps,
+                    sorted: audioData.sorted,
+                    positions: audioData.positions,
+                    diffs: audioData.diffs,
+                    stats: audioStats
+                },
+                video: {
+                    timestamps: videoTimestamps,
+                    sorted: videoData.sorted,
+                    positions: videoData.positions,
+                    diffs: videoData.diffs,
+                    stats: videoStats
+                },
+                totalTags: jsonData.tags.length
+            };
+        }
+        
+        // 显示文件信息
+        function showFileInfo(data) {
+            let infoHtml = `
+                <p><strong>文件名:</strong> ${data.filename}</p>
+                <p><strong>总标签数:</strong> ${data.totalTags}</p>
+            `;
+            
+            if (Object.keys(data.metadata).length > 0) {
+                infoHtml += `<p><strong>元数据:</strong></p><pre>${JSON.stringify(data.metadata, null, 2)}</pre>`;
+            }
+            
+            // 音频统计
+            if (data.audio.timestamps.length > 0) {
+                const audioDuration = Math.max(...data.audio.timestamps.map(t => t.timestamp)) - 
+                                    Math.min(...data.audio.timestamps.map(t => t.timestamp));
+                infoHtml += `
+                    <h4>音频统计</h4>
+                    <p>音频帧数: ${data.audio.timestamps.length}</p>
+                    <p>音频时长: ${audioDuration}ms</p>
+                `;
+                if (data.audio.diffs.length > 0) {
+                    infoHtml += `
+                        <p>平均间隔: ${data.audio.stats.avg.toFixed(2)}ms | 
+                           最大间隔: ${data.audio.stats.max}ms | 
+                           最小间隔: ${data.audio.stats.min}ms</p>
+                    `;
+                }
+            }
+            
+            // 视频统计
+            if (data.video.timestamps.length > 0) {
+                const videoDuration = Math.max(...data.video.timestamps.map(t => t.timestamp)) - 
+                                    Math.min(...data.video.timestamps.map(t => t.timestamp));
+                infoHtml += `
+                    <h4>视频统计</h4>
+                    <p>视频帧数: ${data.video.timestamps.length}</p>
+                    <p>视频时长: ${videoDuration}ms</p>
+                `;
+                if (data.video.diffs.length > 0) {
+                    infoHtml += `
+                        <p>平均间隔: ${data.video.stats.avg.toFixed(2)}ms | 
+                           最大间隔: ${data.video.stats.max}ms | 
+                           最小间隔: ${data.video.stats.min}ms</p>
+                    `;
+                }
+            }
+            
+            fileInfo.innerHTML = infoHtml;
+        }
+        
+        // 创建图表
+        function createCharts(data) {
+            console.log('Creating charts with data:', data);
+            
+            // 清空之前的图表实例
+            if (window.audioChartInstance) {
+                window.audioChartInstance.dispose();
+            }
+            if (window.videoChartInstance) {
+                window.videoChartInstance.dispose();
+            }
+            
+            // 创建音频图表
+            if (data.audio.diffs.length > 0) {
+                console.log('Creating audio chart');
+                const audioChartContainer = document.getElementById('audioChart');
+                console.log('Audio chart container:', audioChartContainer);
+                if (audioChartContainer) {
+                    // 确保容器可见且有尺寸
+                    audioChartContainer.style.display = 'block';
+                    const audioChart = echarts.init(audioChartContainer);
+                    window.audioChartInstance = audioChart; // 保存实例引用
+                    const audioOption = createChartOption(data.audio, '音频');
+                    console.log('Audio chart option:', audioOption);
+                    audioChart.setOption(audioOption);
+                    // 添加窗口大小改变时重绘图表
+                    window.addEventListener('resize', function() {
+                        audioChart.resize();
+                    });
+                }
+            }
+            
+            // 创建视频图表
+            if (data.video.diffs.length > 0) {
+                console.log('Creating video chart');
+                const videoChartContainer = document.getElementById('videoChart');
+                console.log('Video chart container:', videoChartContainer);
+                if (videoChartContainer) {
+                    // 确保容器可见且有尺寸
+                    videoChartContainer.style.display = 'block';
+                    const videoChart = echarts.init(videoChartContainer);
+                    window.videoChartInstance = videoChart; // 保存实例引用
+                    const videoOption = createChartOption(data.video, '视频');
+                    console.log('Video chart option:', videoOption);
+                    videoChart.setOption(videoOption);
+                    // 添加窗口大小改变时重绘图表
+                    window.addEventListener('resize', function() {
+                        videoChart.resize();
+                    });
+                }
+            }
+        }
+        
+        // 创建图表配置
+        function createChartOption(streamData, streamName) {
+            // 准备数据
+            const dataPoints = [];
+            for (let i = 0; i < streamData.diffs.length; i++) {
+                // 使用后一个时间戳作为x轴值，增量作为y轴值
+                const timestamp = streamData.sorted[i+1].timestamp;
+                const diff = streamData.diffs[i];
+                dataPoints.push([timestamp, diff]);
+            }
+            
+            // 颜色配置
+            const color = streamName === '音频' ? '#5470c6' : '#91cc75';
+            
+            return {
+                title: {
+                    text: `${streamName}时间戳增量分析`,
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'bold'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        if (params.length > 0) {
+                            const param = params[0];
+                            const time = param.axisValue;
+                            const value = param.data[1];
+                            return `${param.seriesName}<br/>` +
+                                   `时间戳: ${time}ms<br/>` +
+                                   `增量: ${value}ms`;
+                        }
+                        return '';
+                    }
+                },
+                grid: {
+                    left: '80px',
+                    right: '40px',
+                    top: '80px',
+                    bottom: '120px'
+                },
+                xAxis: {
+                    type: 'value',
+                    name: '时间戳(ms)',
+                    nameLocation: 'middle',
+                    nameGap: 40,
+                    nameTextStyle: {
+                        fontSize: 14,
+                        fontWeight: 'bold'
+                    },
+                    axisLabel: {
+                        fontSize: 12
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '增量(ms)',
+                    nameLocation: 'middle',
+                    nameGap: 60,
+                    nameTextStyle: {
+                        fontSize: 14,
+                        fontWeight: 'bold'
+                    },
+                    axisLabel: {
+                        fontSize: 12
+                    }
+                },
+                dataZoom: [
+                    {
+                        type: 'inside',
+                        rangeStart: 0,
+                        rangeEnd: 100
+                    },
+                    {
+                        type: 'slider',
+                        rangeStart: 0,
+                        rangeEnd: 100,
+                        bottom: '40px',
+                        textStyle: {
+                            fontSize: 12
+                        }
+                    }
+                ],
+                series: [{
+                    name: `${streamName}增量(ms)`,
+                    type: 'line',
+                    data: dataPoints,
+                    smooth: false,
+                    symbol: 'circle',
+                    symbolSize: 5,
+                    lineStyle: {
+                        width: 2,
+                        color: color
+                    },
+                    itemStyle: {
+                        borderWidth: 1,
+                        borderColor: color,
+                        color: color
+                    },
+                    markLine: streamData.stats.avg ? {
+                        data: [{
+                            name: '平均值',
+                            yAxis: streamData.stats.avg
+                        }],
+                        lineStyle: {
+                            type: 'dashed',
+                            width: 2,
+                            color: '#ff7f50'
+                        },
+                        label: {
+                            fontSize: 12,
+                            color: '#333'
+                        }
+                    } : null
+                }]
+            };
+        }
+        
+        // 显示/隐藏元素
+        function showLoading(show) {
+            loading.classList.toggle('hidden', !show);
+        }
+        
+        function showError(message) {
+            if (message) {
+                errorMessage.textContent = message;
+                error.classList.remove('hidden');
+            } else {
+                error.classList.add('hidden');
+            }
+        }
+        
+        function showCharts(show) {
+            charts.classList.toggle('hidden', !show);
+        }
+        
+        function showInfoPanel(show) {
+            infoPanel.classList.toggle('hidden', !show);
+        }
+    </script>
+</body>
+</html>
