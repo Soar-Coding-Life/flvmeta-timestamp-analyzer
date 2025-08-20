@@ -76,7 +76,7 @@ def handle_mcp_request(request):
                     },
                     "serverInfo": {
                         "name": "flv-timestamp-analyzer",
-                        "version": "1.0.5"
+                        "version": "1.0.6"
                     }
                 }
             }
@@ -89,13 +89,45 @@ def handle_mcp_request(request):
                     "tools": [
                         {
                             "name": "analyze_flv",
-                            "description": "分析FLV文件的时间戳信息",
+                            "description": "分析FLV文件的时间戳信息，提供详细报告和异常检测",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
                                     "file_path": {
                                         "type": "string",
                                         "description": "FLV文件路径"
+                                    }
+                                },
+                                "required": ["file_path"]
+                            }
+                        },
+                        {
+                            "name": "analyze_flv_json",
+                            "description": "分析FLV文件并返回完整的JSON数据结构，包含所有时间戳信息",
+                            "inputSchema": {
+                                "type": "object", 
+                                "properties": {
+                                    "file_path": {
+                                        "type": "string",
+                                        "description": "FLV文件路径"
+                                    }
+                                },
+                                "required": ["file_path"]
+                            }
+                        },
+                        {
+                            "name": "generate_flv_report",
+                            "description": "分析FLV文件并生成HTML可视化报告",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "file_path": {
+                                        "type": "string", 
+                                        "description": "FLV文件路径"
+                                    },
+                                    "output_path": {
+                                        "type": "string",
+                                        "description": "HTML输出文件路径（可选）"
                                     }
                                 },
                                 "required": ["file_path"]
@@ -109,7 +141,7 @@ def handle_mcp_request(request):
             tool_name = params.get("name")
             arguments = params.get("arguments", {})
             
-            if tool_name == "analyze_flv":
+            if tool_name in ["analyze_flv", "analyze_flv_json", "generate_flv_report"]:
                 file_path = arguments.get("file_path")
                 if not file_path:
                     response = {
@@ -123,7 +155,9 @@ def handle_mcp_request(request):
                 else:
                     # 执行FLV分析
                     try:
-                        from flvmeta_timestamp_analyzer.analyzer import parse_flv_with_flvmeta, analyze_timestamps
+                        from flvmeta_timestamp_analyzer.analyzer import parse_flv_with_flvmeta, analyze_timestamps, create_charts
+                        import os
+                        import json as json_lib
                         
                         if not os.path.exists(file_path):
                             raise FileNotFoundError(f"文件不存在: {file_path}")
@@ -132,19 +166,172 @@ def handle_mcp_request(request):
                         json_data = parse_flv_with_flvmeta(file_path)
                         analysis_data = analyze_timestamps(json_data, file_path)
                         
-                        response = {
-                            "jsonrpc": "2.0",
-                            "id": request_id,
-                            "result": {
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": f"FLV文件分析完成！\n文件名: {analysis_data['filename']}\n总标签数: {analysis_data['total_tags']}\n音频帧数: {len(analysis_data['audio']['timestamps'])}\n视频帧数: {len(analysis_data['video']['timestamps'])}"
-                                    }
-                                ],
-                                "isError": False
+                        if tool_name == "analyze_flv_json":
+                            # 返回完整的JSON数据
+                            response = {
+                                "jsonrpc": "2.0",
+                                "id": request_id,
+                                "result": {
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": f"**完整FLV分析数据 - {analysis_data['filename']}**\n\n```json\n{json_lib.dumps(analysis_data, indent=2, ensure_ascii=False)}\n```"
+                                        }
+                                    ],
+                                    "isError": False
+                                }
                             }
-                        }
+                        elif tool_name == "generate_flv_report":
+                            # 生成HTML报告
+                            output_path = arguments.get("output_path") 
+                            if not output_path:
+                                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                                output_path = f"{base_name}_timestamp_analysis.html"
+                            
+                            try:
+                                create_charts(analysis_data, output_path)
+                                abs_path = os.path.abspath(output_path)
+                                
+                                response = {
+                                    "jsonrpc": "2.0",
+                                    "id": request_id,
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": f"📈 **HTML可视化报告已生成**\n\n**文件位置**: {abs_path}\n**文件大小**: {os.path.getsize(abs_path) / 1024:.1f} KB\n\n报告包含:\n- 音视频时间戳增量变化曲线\n- 异常点标记和分析\n- 交互式图表（支持缩放和拖拽）\n- 详细统计信息\n\n可以在浏览器中打开查看完整的可视化分析结果。"
+                                            }
+                                        ],
+                                        "isError": False
+                                    }
+                                }
+                            except Exception as chart_error:
+                                response = {
+                                    "jsonrpc": "2.0",
+                                    "id": request_id,
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": f"❌ **HTML报告生成失败**: {str(chart_error)}"
+                                            }
+                                        ],
+                                        "isError": True
+                                    }
+                                }
+                        else:  # analyze_flv
+                            # 生成详细的分析报告
+                            report_lines = []
+                            report_lines.append("=" * 60)
+                            report_lines.append(f"FLV音视频时间戳分析报告: {analysis_data['filename']}")
+                            report_lines.append("=" * 60)
+                            
+                            # 元数据信息
+                            if analysis_data['metadata']:
+                                report_lines.append("\n📋 **元数据信息**:")
+                                for key, value in analysis_data['metadata'].items():
+                                    report_lines.append(f"  - {key}: {value}")
+                            
+                            report_lines.append(f"\n📊 **基本统计**:")
+                            report_lines.append(f"  - 总标签数: {analysis_data['total_tags']}")
+                            
+                            # 音频分析结果
+                            if analysis_data['audio']['timestamps']:
+                                audio_stats = analysis_data['audio']['stats']
+                                audio_duration = max(t['timestamp'] for t in analysis_data['audio']['timestamps']) - min(t['timestamp'] for t in analysis_data['audio']['timestamps'])
+                                report_lines.append(f"\n🔊 **音频分析**:")
+                                report_lines.append(f"  - 音频帧数: {len(analysis_data['audio']['timestamps'])}")
+                                report_lines.append(f"  - 音频时长: {audio_duration}ms")
+                                if audio_stats:
+                                    report_lines.append(f"  - 平均间隔: {audio_stats['avg']:.2f}ms")
+                                    report_lines.append(f"  - 最大间隔: {audio_stats['max']}ms")  
+                                    report_lines.append(f"  - 最小间隔: {audio_stats['min']}ms")
+                                    
+                                    # 音频异常检测
+                                    if audio_stats.get('anomalies'):
+                                        report_lines.append(f"  - ⚠️ 检测到 {len(audio_stats['anomalies'])} 个音频异常:")
+                                        for anom in audio_stats['anomalies'][:5]:  # 只显示前5个
+                                            report_lines.append(f"    * {anom['type']} at {anom['position']}ms (值: {anom['value']}ms)")
+                                        if len(audio_stats['anomalies']) > 5:
+                                            report_lines.append(f"    * ... 还有 {len(audio_stats['anomalies']) - 5} 个异常")
+                                    else:
+                                        report_lines.append("  - ✅ 未检测到音频异常")
+                            else:
+                                report_lines.append(f"\n🔊 **音频分析**: 无音频数据")
+                                
+                            # 视频分析结果
+                            if analysis_data['video']['timestamps']:
+                                video_stats = analysis_data['video']['stats']
+                                video_duration = max(t['timestamp'] for t in analysis_data['video']['timestamps']) - min(t['timestamp'] for t in analysis_data['video']['timestamps'])
+                                report_lines.append(f"\n🎥 **视频分析**:")
+                                report_lines.append(f"  - 视频帧数: {len(analysis_data['video']['timestamps'])}")
+                                report_lines.append(f"  - 视频时长: {video_duration}ms")
+                                if video_stats:
+                                    report_lines.append(f"  - 平均间隔: {video_stats['avg']:.2f}ms")
+                                    report_lines.append(f"  - 最大间隔: {video_stats['max']}ms")
+                                    report_lines.append(f"  - 最小间隔: {video_stats['min']}ms")
+                                    
+                                    # 视频异常检测
+                                    if video_stats.get('anomalies'):
+                                        report_lines.append(f"  - ⚠️ 检测到 {len(video_stats['anomalies'])} 个视频异常:")
+                                        for anom in video_stats['anomalies'][:5]:  # 只显示前5个
+                                            report_lines.append(f"    * {anom['type']} at {anom['position']}ms (值: {anom['value']}ms)")
+                                        if len(video_stats['anomalies']) > 5:
+                                            report_lines.append(f"    * ... 还有 {len(video_stats['anomalies']) - 5} 个异常")
+                                    else:
+                                        report_lines.append("  - ✅ 未检测到视频异常")
+                            else:
+                                report_lines.append(f"\n🎥 **视频分析**: 无视频数据")
+                                
+                            # 生成HTML可视化报告
+                            try:
+                                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                                html_output = f"{base_name}_timestamp_analysis.html"
+                                create_charts(analysis_data, html_output)
+                                report_lines.append(f"\n📈 **可视化报告**: {os.path.abspath(html_output)}")
+                            except Exception as chart_error:
+                                report_lines.append(f"\n📈 **可视化报告**: 生成失败 - {str(chart_error)}")
+                            
+                            report_lines.append("=" * 60)
+                            
+                            # 构造响应内容
+                            content_items = [
+                                {
+                                    "type": "text",
+                                    "text": "\n".join(report_lines)
+                                }
+                            ]
+                            
+                            # 添加JSON数据作为额外内容
+                            json_summary = {
+                                "filename": analysis_data['filename'],
+                                "total_tags": analysis_data['total_tags'],
+                                "metadata": analysis_data['metadata'],
+                                "audio": {
+                                    "frame_count": len(analysis_data['audio']['timestamps']),
+                                    "duration_ms": max(t['timestamp'] for t in analysis_data['audio']['timestamps']) - min(t['timestamp'] for t in analysis_data['audio']['timestamps']) if analysis_data['audio']['timestamps'] else 0,
+                                    "stats": analysis_data['audio']['stats']
+                                },
+                                "video": {
+                                    "frame_count": len(analysis_data['video']['timestamps']),
+                                    "duration_ms": max(t['timestamp'] for t in analysis_data['video']['timestamps']) - min(t['timestamp'] for t in analysis_data['video']['timestamps']) if analysis_data['video']['timestamps'] else 0,
+                                    "stats": analysis_data['video']['stats']
+                                }
+                            }
+                            
+                            content_items.append({
+                                "type": "text",
+                                "text": f"\n**JSON数据摘要**:\n```json\n{json_lib.dumps(json_summary, indent=2, ensure_ascii=False)}\n```"
+                            })
+                            
+                            response = {
+                                "jsonrpc": "2.0",
+                                "id": request_id,
+                                "result": {
+                                    "content": content_items,
+                                    "isError": False
+                                }
+                            }
                     except Exception as e:
                         response = {
                             "jsonrpc": "2.0",
