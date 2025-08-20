@@ -1,5 +1,5 @@
 {
-  "name": "@coderwgb/flvmeta-timestamp-analyzer",
+  "name": "flvmeta-timestamp-analyzer",
   "version": "1.0.1",
   "description": "FLV音视频时间戳分析工具，可通过MCP协议调用",
   "main": "mcp_server.py",
@@ -22,12 +22,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/flvmeta-timestamp-analyzer.git"
+    "url": "https://github.com/Soar-Coding-Life/flvmeta-timestamp-analyzer.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/flvmeta-timestamp-analyzer/issues"
+    "url": "https://github.com/Soar-Coding-Life/flvmeta-timestamp-analyzer/issues"
   },
-  "homepage": "https://github.com/yourusername/flvmeta-timestamp-analyzer#readme",
+  "homepage": "https://github.com/Soar-Coding-Life/flvmeta-timestamp-analyzer#readme",
   "mcp": {
     "config": "mcp.config.json"
   }
