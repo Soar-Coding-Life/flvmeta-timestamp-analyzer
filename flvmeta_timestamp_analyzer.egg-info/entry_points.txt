@@ -1,2 +1,0 @@
-[console_scripts]
-flv-timestamp-analyzer = flv_timestamp_analyzer:main
