@@ -40,20 +40,6 @@ def setup_logging():
 # 全局日志记录器
 logger = setup_logging()
 
-def send_response(response):
-    """发送响应到标准输出"""
-    logger.debug(f"Sending response: {response}")
-    print(json.dumps(response), flush=True)
-
-def send_error(message, details=None):
-    """发送错误响应"""
-    logger.error(f"Error: {message}, Details: {details}")
-    error_response = {
-        "error": message,
-        "details": details or ""
-    }
-    send_response(error_response)
-
 def load_config():
     """加载配置文件"""
     try:
@@ -67,179 +53,205 @@ def load_config():
             "request_timeout": 30
         }
 
-def analyze_flv_via_mcp(request_data):
-    """通过MCP协议分析FLV文件"""
-    logger.info("Starting FLV analysis")
+def handle_mcp_request(request):
+    """处理MCP请求"""
     try:
-        # 验证输入
-        if 'file_path' not in request_data:
-            send_error("Missing 'file_path' in request")
-            return
-            
-        file_path = request_data['file_path']
-        logger.debug(f"Analyzing file: {file_path}")
+        method = request.get("method")
+        params = request.get("params", {})
+        request_id = request.get("id")
         
-        # 检查文件是否存在
-        if not os.path.exists(file_path):
-            send_error(f"File not found: {file_path}")
-            return
-            
-        # 使用flvmeta解析FLV文件
-        logger.debug("Calling flvmeta to parse FLV file")
-        json_data = parse_flv_with_flvmeta(file_path)
-        logger.debug(f"flvmeta parsing completed, got {len(json_data.get('tags', []))} tags")
+        logger.debug(f"处理方法: {method}")
         
-        # 分析时间戳变化
-        logger.debug("Analyzing timestamps")
-        analysis_data = analyze_timestamps(json_data, file_path)
-        logger.debug("Timestamp analysis completed")
-        
-        # 构造响应
-        response = {
-            "status": "success",
-            "data": analysis_data
-        }
-        
-        logger.info("Analysis completed successfully")
-        send_response(response)
-        
-    except Exception as e:
-        logger.error(f"Analysis failed: {str(e)}")
-        send_error(f"Analysis failed: {str(e)}", traceback.format_exc())
-
-def handle_mcp_protocol():
-    """处理MCP协议握手和消息"""
-    # 读取MCP协议握手消息
-    input_line = sys.stdin.readline()
-    if not input_line:
-        return False
-        
-    try:
-        # 解析握手消息
-        handshake = json.loads(input_line.strip())
-        if handshake.get("protocol_version") != "mcp-0.1":
-            send_error("Unsupported protocol version")
-            return False
-            
-        # 发送握手响应
-        response = {
-            "protocol_version": "mcp-0.1",
-            "models": [
-                {
-                    "name": "flv-timestamp-analyzer",
-                    "description": "FLV音视频时间戳分析工具",
+        if method == "initialize":
+            # 初始化响应
+            response = {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "protocolVersion": "2024-11-05",
                     "capabilities": {
-                        "can_stream": False,
-                        "can_accept_audio_input": False,
-                        "can_accept_image_input": False,
-                        "can_accept_text_input": False,
-                        "can_accept_file_input": True
+                        "tools": {
+                            "listChanged": False
+                        }
+                    },
+                    "serverInfo": {
+                        "name": "flv-timestamp-analyzer",
+                        "version": "1.0.5"
                     }
                 }
-            ]
-        }
-        print(json.dumps(response), flush=True)
-        return True
+            }
+        elif method == "tools/list":
+            # 返回可用工具列表
+            response = {
+                "jsonrpc": "2.0", 
+                "id": request_id,
+                "result": {
+                    "tools": [
+                        {
+                            "name": "analyze_flv",
+                            "description": "分析FLV文件的时间戳信息",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "file_path": {
+                                        "type": "string",
+                                        "description": "FLV文件路径"
+                                    }
+                                },
+                                "required": ["file_path"]
+                            }
+                        }
+                    ]
+                }
+            }
+        elif method == "tools/call":
+            # 执行工具调用
+            tool_name = params.get("name")
+            arguments = params.get("arguments", {})
+            
+            if tool_name == "analyze_flv":
+                file_path = arguments.get("file_path")
+                if not file_path:
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32602,
+                            "message": "Invalid params: file_path is required"
+                        }
+                    }
+                else:
+                    # 执行FLV分析
+                    try:
+                        from flvmeta_timestamp_analyzer.analyzer import parse_flv_with_flvmeta, analyze_timestamps
+                        
+                        if not os.path.exists(file_path):
+                            raise FileNotFoundError(f"文件不存在: {file_path}")
+                            
+                        # 解析FLV文件
+                        json_data = parse_flv_with_flvmeta(file_path)
+                        analysis_data = analyze_timestamps(json_data, file_path)
+                        
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": request_id,
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": f"FLV文件分析完成！\n文件名: {analysis_data['filename']}\n总标签数: {analysis_data['total_tags']}\n音频帧数: {len(analysis_data['audio']['timestamps'])}\n视频帧数: {len(analysis_data['video']['timestamps'])}"
+                                    }
+                                ],
+                                "isError": False
+                            }
+                        }
+                    except Exception as e:
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": request_id,
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text", 
+                                        "text": f"分析失败: {str(e)}"
+                                    }
+                                ],
+                                "isError": True
+                            }
+                        }
+            else:
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32601,
+                        "message": f"Unknown tool: {tool_name}"
+                    }
+                }
+        else:
+            response = {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32601,
+                    "message": f"Method not found: {method}"
+                }
+            }
+            
+        return response
+        
     except Exception as e:
-        logger.error(f"Handshake failed: {str(e)}")
-        send_error(f"Handshake failed: {str(e)}")
-        return False
+        logger.error(f"处理请求时出错: {str(e)}")
+        return {
+            "jsonrpc": "2.0",
+            "id": request.get("id"),
+            "error": {
+                "code": -32603,
+                "message": f"Internal error: {str(e)}"
+            }
+        }
 
 def main():
-    """主函数 - 通过stdio提供MCP服务"""
-    # 检查是否是直接运行脚本而不是作为MCP服务
+    """主函数 - MCP服务器"""
+    # 检查帮助参数
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
-        # 显示帮助信息
         print("FLV时间戳分析MCP服务")
         print("用法:")
-        print("  直接运行: python3 mcp_server.py <input.flv> [output.html]")
         print("  作为MCP服务: python3 mcp_server.py")
-        print("  安装后: flv-timestamp-analyzer <input.flv> [output.html]")
+        print("  命令行工具: flv-timestamp-analyzer <input.flv> [output.html]")
+        return
+        
+    # 检查是否作为命令行工具运行
+    if len(sys.argv) > 1:
+        from flvmeta_timestamp_analyzer.analyzer import main as analyzer_main
+        analyzer_main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
         return
     
-    # 如果有命令行参数且不是MCP握手参数，则作为命令行工具运行
-    if len(sys.argv) > 1 and not sys.stdin.isatty():
-        # 作为MCP服务运行
-        logger.info("FLV MCP Server started")
-        
-        # 加载配置
-        config = load_config()
-        logger.info(f"Loaded config: {config}")
-        
-        # 处理MCP协议握手
-        if not handle_mcp_protocol():
-            logger.error("MCP protocol handshake failed")
-            return
-        
-        try:
-            logger.debug("Waiting for input from stdin")
-            # 读取标准输入的JSON请求
-            input_data = sys.stdin.read()
-            logger.debug(f"Received input: {input_data}")
-            
-            if not input_data:
-                send_error("No input received")
-                return
+    # 作为MCP服务运行
+    logger.info("启动FLV MCP服务器")
+    
+    try:
+        # MCP服务器主循环
+        for line in sys.stdin:
+            if not line.strip():
+                continue
                 
-            # 解析JSON请求
             try:
-                request_data = json.loads(input_data)
-                logger.debug(f"Parsed request data: {request_data}")
+                request = json.loads(line.strip())
+                logger.debug(f"收到请求: {request}")
+                
+                response = handle_mcp_request(request)
+                print(json.dumps(response), flush=True)
+                
             except json.JSONDecodeError as e:
-                send_error("Invalid JSON in request", str(e))
-                return
+                logger.error(f"JSON解析错误: {e}")
+                error_response = {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {
+                        "code": -32700,
+                        "message": "Parse error"
+                    }
+                }
+                print(json.dumps(error_response), flush=True)
+            except Exception as e:
+                logger.error(f"处理请求时出错: {str(e)}")
+                error_response = {
+                    "jsonrpc": "2.0", 
+                    "id": None,
+                    "error": {
+                        "code": -32603,
+                        "message": f"Internal error: {str(e)}"
+                    }
+                }
+                print(json.dumps(error_response), flush=True)
                 
-            # 处理请求
-            analyze_flv_via_mcp(request_data)
-            
-        except Exception as e:
-            logger.error(f"Server error: {str(e)}")
-            send_error(f"Server error: {str(e)}", traceback.format_exc())
-        finally:
-            logger.info("FLV MCP Server shutting down")
-    elif len(sys.argv) > 1:
-        # 作为命令行工具运行，调用原始分析工具
-        from flv_timestamp_analyzer import main as analyzer_main
-        analyzer_main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
-    else:
-        # 作为MCP服务运行
-        logger.info("FLV MCP Server started")
-        
-        # 加载配置
-        config = load_config()
-        logger.info(f"Loaded config: {config}")
-        
-        # 处理MCP协议握手
-        if not handle_mcp_protocol():
-            logger.error("MCP protocol handshake failed")
-            return
-        
-        try:
-            logger.debug("Waiting for input from stdin")
-            # 读取标准输入的JSON请求
-            input_data = sys.stdin.read()
-            logger.debug(f"Received input: {input_data}")
-            
-            if not input_data:
-                send_error("No input received")
-                return
-                
-            # 解析JSON请求
-            try:
-                request_data = json.loads(input_data)
-                logger.debug(f"Parsed request data: {request_data}")
-            except json.JSONDecodeError as e:
-                send_error("Invalid JSON in request", str(e))
-                return
-                
-            # 处理请求
-            analyze_flv_via_mcp(request_data)
-            
-        except Exception as e:
-            logger.error(f"Server error: {str(e)}")
-            send_error(f"Server error: {str(e)}", traceback.format_exc())
-        finally:
-            logger.info("FLV MCP Server shutting down")
+    except KeyboardInterrupt:
+        logger.info("收到中断信号，关闭服务器")
+    except Exception as e:
+        logger.error(f"服务器错误: {str(e)}")
+    finally:
+        logger.info("FLV MCP服务器已关闭")
 
 if __name__ == '__main__':
     main()

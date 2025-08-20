@@ -1,11 +1,8 @@
 {
   "name": "flvmeta-timestamp-analyzer",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "FLV音视频时间戳分析工具，可通过MCP协议调用",
   "main": "mcp_server.py",
-  "bin": {
-    "flv-timestamp-analyzer": "./mcp_server.py"
-  },
   "scripts": {
     "start": "python3 mcp_server.py",
     "test": "python3 test_client.py",
@@ -14,12 +11,6 @@
   "keywords": ["flv", "timestamp", "analysis", "mcp", "ai"],
   "author": "CoderWGB",
   "license": "MIT",
-  "dependencies": {
-    "pyecharts": ">=2.0.0"
-  },
-  "engines": {
-    "python": ">=3.6"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Soar-Coding-Life/flvmeta-timestamp-analyzer.git"

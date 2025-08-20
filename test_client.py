@@ -9,9 +9,32 @@ import sys
 
 def test_mcp_service(file_path):
     """测试MCP服务"""
-    # 构造请求数据
-    request_data = {
-        "file_path": file_path
+    # 构造初始化请求
+    init_request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize", 
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {
+                "name": "test-client",
+                "version": "1.0.0"
+            }
+        }
+    }
+    
+    # 构造工具调用请求
+    tool_request = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "analyze_flv",
+            "arguments": {
+                "file_path": file_path
+            }
+        }
     }
     
     # 启动MCP服务进程
@@ -23,8 +46,9 @@ def test_mcp_service(file_path):
         text=True
     )
     
-    # 发送请求并获取响应
-    stdout, stderr = process.communicate(input=json.dumps(request_data))
+    # 发送请求
+    input_data = json.dumps(init_request) + '\n' + json.dumps(tool_request) + '\n'
+    stdout, stderr = process.communicate(input=input_data)
     
     # 检查是否有错误
     if process.returncode != 0:
@@ -34,9 +58,24 @@ def test_mcp_service(file_path):
         
     # 解析响应
     try:
-        response = json.loads(stdout)
-        return response
-    except json.JSONDecodeError as e:
+        # 按行分割输出
+        lines = [line.strip() for line in stdout.strip().split('\n') if line.strip()]
+        
+        # 找到工具调用的响应（通常是第二个响应）
+        for line in lines:
+            try:
+                response = json.loads(line)
+                if response.get("id") == 2:  # 工具调用请求的ID
+                    return response
+            except json.JSONDecodeError:
+                continue
+                
+        # 如果没有找到ID为2的响应，返回最后一个有效的JSON
+        if lines:
+            return json.loads(lines[-1])
+        
+        return None
+    except Exception as e:
         print(f"Failed to parse JSON response: {e}")
         print(f"Raw output: {stdout}")
         return None

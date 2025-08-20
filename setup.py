@@ -8,7 +8,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="flvmeta-timestamp-analyzer",
-    version="1.0.3",
+    version="1.0.5",
     author="CoderWGB",
     author_email="864562082@qq.com",
     description="FLV音视频时间戳分析工具，可通过MCP协议调用",
@@ -27,12 +27,19 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Operating System :: OS Independent",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX :: Linux", 
+        "Operating System :: MacOS",
     ],
     python_requires=">=3.6",
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "flv-timestamp-analyzer=flv_timestamp_analyzer:main",
+            "flv-timestamp-analyzer=flvmeta_timestamp_analyzer:cli_main",
         ],
     },
     package_data={

@@ -465,7 +465,8 @@ def main(flv_path, output_path=None):
         print(f"详细错误: {traceback.format_exc()}")
         return False
 
-if __name__ == "__main__":
+def cli_main():
+    """命令行入口点函数，供setuptools使用"""
     # 检查参数
     if len(sys.argv) < 2 or sys.argv[1] in ['-h', '--help']:
         print(__doc__)
@@ -478,18 +479,12 @@ if __name__ == "__main__":
     # 获取输入文件路径
     flv_path = sys.argv[1]
     
-    # 确定输出路径
+    # 获取输出文件路径（可选）
     output_path = sys.argv[2] if len(sys.argv) > 2 else None
     
-    # 运行主程序
+    # 执行分析
     success = main(flv_path, output_path)
-    
-    if not success:
-        # 提供额外的故障排除建议
-        print("\n故障排除建议:")
-        print("1. 检查FLV文件是否有效: 尝试直接播放文件")
-        print("2. 检查flvmeta版本: 运行 'flvmeta -V'")
-        print("3. 尝试手动运行: flvmeta -F -j <input.flv> output.json")
-        print("4. 更新flvmeta到最新版本")
-        print("5. 尝试使用其他FLV文件进行测试")
-        sys.exit(1)
+    sys.exit(0 if success else 1)
+
+if __name__ == "__main__":
+    cli_main()
