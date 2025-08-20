@@ -8,7 +8,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="flvmeta-timestamp-analyzer",
-    version="1.0.2",
+    version="1.0.3",
     author="CoderWGB",
     author_email="864562082@qq.com",
     description="FLV音视频时间戳分析工具，可通过MCP协议调用",

@@ -1,6 +1,6 @@
 {
   "name": "flvmeta-timestamp-analyzer",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "FLV音视频时间戳分析工具，可通过MCP协议调用",
   "main": "mcp_server.py",
   "bin": {
