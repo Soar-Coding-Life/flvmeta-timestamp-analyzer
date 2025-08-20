@@ -1,3 +1,35 @@
+Metadata-Version: 2.4
+Name: flvmeta-timestamp-analyzer
+Version: 1.0.0
+Summary: FLV音视频时间戳分析工具，可通过MCP协议调用
+Home-page: https://github.com/yourusername/flvmeta-timestamp-analyzer
+Author: Your Name
+Author-email: your.email@example.com
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Multimedia :: Video
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pyecharts>=2.0.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 # FLV Timestamp Analyzer
 
 FLV音视频时间戳分析工具，可用于检测FLV文件中的时间戳异常，如时间回退、大跳跃、缺失帧等问题。

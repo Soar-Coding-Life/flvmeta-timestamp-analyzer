@@ -1,0 +1,5 @@
+{
+  "log_level": "debug",
+  "max_workers": 4,
+  "request_timeout": 30
+}

@@ -1,0 +1,20 @@
+{
+  "models": [
+    {
+      "name": "flv-timestamp-analyzer",
+      "description": "FLV音视频时间戳分析工具",
+      "capabilities": {
+        "can_stream": false,
+        "can_accept_audio_input": false,
+        "can_accept_image_input": false,
+        "can_accept_text_input": false,
+        "can_accept_file_input": true
+      },
+      "metadata": {
+        "author": "Your Name",
+        "version": "1.0.0",
+        "license": "MIT"
+      }
+    }
+  ]
+}
