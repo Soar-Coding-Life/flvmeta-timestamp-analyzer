@@ -4,8 +4,20 @@
 
 ## 🚀 快速安装
 
+### 基础安装
 ```bash
 pip install flvmeta-timestamp-analyzer
+```
+
+### MCP功能完整支持
+如需使用MCP功能，建议安装FastMCP依赖：
+```bash
+pip install flvmeta-timestamp-analyzer[fastmcp]
+```
+或分步安装：
+```bash
+pip install flvmeta-timestamp-analyzer
+pip install fastmcp mcp pydantic
 ```
 
 **依赖要求**：需要安装 [flvmeta](https://github.com/noirotm/flvmeta) 工具：
@@ -34,12 +46,29 @@ python3 flvmeta_timestamp_analyzer/analyzer.py input.flv
 
 本工具支持 [Model Context Protocol (MCP)](https://modelcontextprotocol.io) 协议，可集成到支持MCP的AI客户端中。
 
-> **重要提示**：使用MCP功能需要先通过 `pip install flvmeta-timestamp-analyzer` 安装包。
+> **重要提示**：
+> - 使用MCP功能需要先安装包：`pip install flvmeta-timestamp-analyzer[fastmcp]`
+> - 推荐安装FastMCP依赖以获得更好的MCP协议支持和性能
+> - 1.0.10+ 版本已解决环境冲突问题，支持全局安装配置
 
 ### Claude Desktop 配置
 
 在 `~/.config/claude/claude_desktop_config.json` (Linux/macOS) 或 `%APPDATA%\Claude\claude_desktop_config.json` (Windows) 中添加：
 
+#### 推荐方式 (全局安装，v1.0.10+)
+```json
+{
+  "mcpServers": {
+    "flv-timestamp-analyzer": {
+      "command": "flv-mcp-server",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+```
+
+#### 兼容方式 (适用于较老版本)
 ```json
 {
   "mcpServers": {
@@ -55,6 +84,16 @@ python3 flvmeta_timestamp_analyzer/analyzer.py input.flv
 
 在 VSCode 设置中的 Cline MCP 服务器配置：
 
+#### 推荐方式 (v1.0.10+)
+```json
+{
+  "name": "flv-timestamp-analyzer",
+  "command": "flv-mcp-server",
+  "args": []
+}
+```
+
+#### 兼容方式
 ```json
 {
   "name": "flv-timestamp-analyzer",
@@ -67,6 +106,23 @@ python3 flvmeta_timestamp_analyzer/analyzer.py input.flv
 
 在 `~/.continue/config.json` 中添加：
 
+#### 推荐方式 (v1.0.10+)
+```json
+{
+  "experimental": {
+    "modelContextProtocol": {
+      "servers": [
+        {
+          "name": "flv-timestamp-analyzer",
+          "command": ["flv-mcp-server"]
+        }
+      ]
+    }
+  }
+}
+```
+
+#### 兼容方式
 ```json
 {
   "experimental": {
@@ -86,6 +142,21 @@ python3 flvmeta_timestamp_analyzer/analyzer.py input.flv
 
 在 Cursor 的设置中添加 MCP 服务器：
 
+#### 推荐方式 (v1.0.10+)
+```json
+{
+  "mcp": {
+    "servers": {
+      "flv-timestamp-analyzer": {
+        "command": "flv-mcp-server",
+        "args": []
+      }
+    }
+  }
+}
+```
+
+#### 兼容方式
 ```json
 {
   "mcp": {
@@ -239,12 +310,28 @@ python3 test_client.py your_file.flv
    ```
 
 3. **MCP连接失败**
-   - 确保已安装包: `pip install flvmeta-timestamp-analyzer`
-   - 检查Python命令是否正确 (`python` vs `python3`)
+   - 确保已安装包: `pip install flvmeta-timestamp-analyzer[fastmcp]`
+   - v1.0.10+: 直接使用 `flv-mcp-server` 命令
+   - 较老版本: 检查Python命令是否正确 (`python` vs `python3`)
    - 查看 `mcp_server.log` 日志文件
    - 检查AI客户端的MCP配置格式
 
-4. **路径问题 (源码运行)**
+4. **环境冲突问题**
+   ```bash
+   # 如遇到环境冲突，使用全局安装方式
+   pip install --upgrade flvmeta-timestamp-analyzer[fastmcp]
+   # 然后使用 flv-mcp-server 命令而非 python -m 方式
+   ```
+
+5. **FastMCP依赖问题**
+   ```bash
+   # 单独安装FastMCP相关依赖
+   pip install fastmcp mcp pydantic
+   # 或使用额外依赖安装
+   pip install flvmeta-timestamp-analyzer[fastmcp]
+   ```
+
+6. **路径问题 (源码运行)**
    ```bash
    # 确保正确设置 PYTHONPATH (仅源码运行需要)
    export PYTHONPATH="/path/to/flvmeta-timestamp-analyzer:$PYTHONPATH"

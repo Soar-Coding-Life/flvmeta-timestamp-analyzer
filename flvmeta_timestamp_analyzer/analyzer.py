@@ -2,10 +2,10 @@
 """
 FLV音视频时间戳分析工具
 用法: 
-  python3 flv_timestamp_analyzer.py <input.flv> [output.html]
+  flv-timestamp-analyzer <input.flv> [output.html]
 示例:
-  python3 flv_timestamp_analyzer.py test.flv
-  python3 flv_timestamp_analyzer.py test.flv analysis.html
+  flv-timestamp-analyzer test.flv
+  flv-timestamp-analyzer test.flv analysis.html
 """
 
 import json
